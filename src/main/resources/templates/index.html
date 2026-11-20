@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Trading Simulator</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body class="bg-light">
+
+<div class="container py-4">
+    <div class="d-flex flex-wrap justify-content-between align-items-center mb-3">
+        <h1 class="h2 text-primary mb-0">💹 Trading Simulator</h1>
+        <div>
+            <a class="btn btn-sm btn-outline-secondary" href="/swagger-ui.html" target="_blank">API docs</a>
+            <a class="btn btn-sm btn-outline-secondary" href="/">Refresh</a>
+        </div>
+    </div>
+
+    <div class="alert alert-success" th:if="${message}" th:text="${message}"></div>
+    <div class="alert alert-danger" th:if="${error}" th:text="${error}"></div>
+
+    <!-- Statistics -->
+    <div class="row g-3 mb-4">
+        <div class="col-6 col-md-3"><div class="card shadow-sm text-center p-2">
+            <div class="text-muted small">Orders</div><div class="h4 mb-0" th:text="${stats.totalOrders()}">0</div></div></div>
+        <div class="col-6 col-md-3"><div class="card shadow-sm text-center p-2">
+            <div class="text-muted small">Open orders</div><div class="h4 mb-0" th:text="${stats.openOrders()}">0</div></div></div>
+        <div class="col-6 col-md-3"><div class="card shadow-sm text-center p-2">
+            <div class="text-muted small">Trades</div><div class="h4 mb-0" th:text="${stats.totalTrades()}">0</div></div></div>
+        <div class="col-6 col-md-3"><div class="card shadow-sm text-center p-2">
+            <div class="text-muted small">Traded value</div>
+            <div class="h4 mb-0" th:text="${#numbers.formatDecimal(stats.tradedValue(), 1, 'COMMA', 2, 'POINT')}">0.00</div></div></div>
+    </div>
+
+    <!-- Order form -->
+    <form action="/orders" method="post" class="card p-3 shadow-sm mb-4">
+        <div class="row g-2 align-items-end">
+            <div class="col-6 col-md-2">
+                <label class="form-label">Type</label>
+                <select name="type" class="form-select" required>
+                    <option value="BUY">Buy</option>
+                    <option value="SELL">Sell</option>
+                </select>
+            </div>
+            <div class="col-6 col-md-2">
+                <label class="form-label">User</label>
+                <input type="text" name="user" class="form-control" maxlength="30" required>
+            </div>
+            <div class="col-6 col-md-2">
+                <label class="form-label">Symbol</label>
+                <input type="text" name="symbol" class="form-control text-uppercase" maxlength="10"
+                       placeholder="AAPL" list="symbols" required>
+                <datalist id="symbols"><option th:each="b : ${books}" th:value="${b.symbol()}"></option></datalist>
+            </div>
+            <div class="col-6 col-md-2">
+                <label class="form-label">Price</label>
+                <input type="number" name="price" class="form-control" min="0.01" step="0.01" required>
+            </div>
+            <div class="col-6 col-md-2">
+                <label class="form-label">Quantity</label>
+                <input type="number" name="quantity" class="form-control" min="1" step="1" required>
+            </div>
+            <div class="col-6 col-md-2 d-grid">
+                <button type="submit" class="btn btn-success">Place order</button>
+            </div>
+        </div>
+    </form>
+
+    <!-- Order books -->
+    <h4>📚 Order books</h4>
+    <p class="text-muted" th:if="${#lists.isEmpty(books)}">No orders yet. Place your first order above.</p>
+    <div class="row g-3 mb-4">
+        <div class="col-lg-6" th:each="b : ${books}">
+            <div class="card shadow-sm">
+                <div class="card-header d-flex justify-content-between">
+                    <strong th:text="${b.symbol()}">AAPL</strong>
+                    <span class="text-muted small" th:if="${stats.lastPrices().containsKey(b.symbol())}"
+                          th:text="'Last: ' + ${stats.lastPrices().get(b.symbol())}"></span>
+                </div>
+                <div class="card-body p-2">
+                    <div class="row">
+                        <div class="col-6">
+                            <div class="small fw-bold text-success">Bids (buyers)</div>
+                            <table class="table table-sm mb-0">
+                                <thead><tr><th>Price</th><th class="text-end">Qty</th></tr></thead>
+                                <tbody>
+                                <tr th:each="l : ${b.bids()}">
+                                    <td th:text="${l.price()}"></td><td class="text-end" th:text="${l.totalQuantity()}"></td>
+                                </tr>
+                                <tr th:if="${#lists.isEmpty(b.bids())}"><td colspan="2" class="text-muted">none</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                        <div class="col-6">
+                            <div class="small fw-bold text-danger">Asks (sellers)</div>
+                            <table class="table table-sm mb-0">
+                                <thead><tr><th>Price</th><th class="text-end">Qty</th></tr></thead>
+                                <tbody>
+                                <tr th:each="l : ${b.asks()}">
+                                    <td th:text="${l.price()}"></td><td class="text-end" th:text="${l.totalQuantity()}"></td>
+                                </tr>
+                                <tr th:if="${#lists.isEmpty(b.asks())}"><td colspan="2" class="text-muted">none</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-3">
+        <!-- Open orders -->
+        <div class="col-lg-6">
+            <h4>📃 Open orders</h4>
+            <div class="table-responsive card shadow-sm">
+                <table class="table table-sm table-hover mb-0 align-middle">
+                    <thead><tr><th>#</th><th>Side</th><th>User</th><th>Symbol</th><th>Price</th><th>Left</th><th></th></tr></thead>
+                    <tbody>
+                    <tr th:each="o : ${openOrders}">
+                        <td th:text="${o.id()}"></td>
+                        <td><span th:class="${o.type().name() == 'BUY'} ? 'badge bg-success' : 'badge bg-danger'"
+                                  th:text="${o.type()}"></span></td>
+                        <td th:text="${o.user()}"></td>
+                        <td th:text="${o.symbol()}"></td>
+                        <td th:text="${o.price()}"></td>
+                        <td th:text="${o.remainingQuantity()} + ' / ' + ${o.quantity()}"></td>
+                        <td>
+                            <form th:action="@{/orders/{id}/cancel(id=${o.id()})}" method="post">
+                                <button class="btn btn-sm btn-outline-danger" type="submit">Cancel</button>
+                            </form>
+                        </td>
+                    </tr>
+                    <tr th:if="${#lists.isEmpty(openOrders)}"><td colspan="7" class="text-muted p-3">No open orders.</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Trades -->
+        <div class="col-lg-6">
+            <h4 class="text-success">✅ Recent trades</h4>
+            <div class="table-responsive card shadow-sm">
+                <table class="table table-sm table-hover mb-0">
+                    <thead><tr><th>Symbol</th><th>Buyer</th><th>Seller</th><th>Price</th><th>Qty</th></tr></thead>
+                    <tbody>
+                    <tr th:each="t : ${trades}" class="table-success">
+                        <td th:text="${t.symbol()}"></td>
+                        <td th:text="${t.buyer()}"></td>
+                        <td th:text="${t.seller()}"></td>
+                        <td th:text="${t.price()}"></td>
+                        <td th:text="${t.quantity()}"></td>
+                    </tr>
+                    <tr th:if="${#lists.isEmpty(trades)}"><td colspan="5" class="text-muted p-3">No trades yet.</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+</body>
+</html>
